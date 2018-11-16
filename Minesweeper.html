@@ -1,0 +1,270 @@
+<html>
+	<head>
+		<!-- This is a game done by hm-ysjiang (github.com/hm-ysjiang). Licensed under the MIT License -->
+		<title>Minesweeper</title>
+		<meta charset="UTF-8">
+		<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.7.2/p5.min.js"></script>
+		<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.7.2/addons/p5.dom.min.js"></script>
+		<script>
+			////Constants
+			const color_BG = "#919191";
+			const color_NOPENED = "#aaaaaa";
+			const color_OPENED = "#777777";
+
+			////Variables
+			//GameLogic
+			var clickDelay;
+			//The phase of the game, Lost:-1, Gaming:0, Won: 1
+			var gamePhase;
+			//The position of the tiles, render purpose
+			var tilePos = [];
+			var tiles = [];
+			var generated;
+			//The map of the mines
+			var minemap = [];
+			var explosion_loc;
+
+
+			function setup(){
+				cnv = createCanvas(340, 400); //30 * 9 + 5 * 8 + 15 * 2
+				cnv.attribute('oncontextmenu', 'return false');
+				setupTilePosition();
+				resetGame();
+			}
+
+			function draw(){
+				if (clickDelay > 0)	clickDelay--;
+				drawBG();
+				drawText();
+				drawTile();
+			}
+
+			function mousePressed(){
+				if (clickDelay == 0){
+					clickDelay = 2;
+					if (mouseButton === LEFT){
+						if (mouseX > 50 && mouseX < 290 && mouseY > 10 && mouseY < 65)
+							resetGame();
+						else if (gamePhase == 0){
+							for (let i = 0 ; i<9 ; i++){
+								for (let j = 0 ; j<9 ; j++){
+									if (tiles[i][j].stepon(mouseX, mouseY)){
+										if (!generated){
+											generateMap(i * 9 + j);
+											generated = true;
+										}
+										if (tiles[i][j].opened){
+											if (minemap[i][j] == -1){
+												explode();
+												explosion_loc = i * 9 + j;
+											}
+											openTile(i, j, true);	
+										}
+										check();
+										break;
+									}
+								}
+							}
+						}
+					}
+					else if (mouseButton === RIGHT && gamePhase == 0){
+						for (let i = 0 ; i<9 ; i++){
+							for (let j = 0 ; j<9 ; j++){
+								if (tiles[i][j].switch_(mouseX, mouseY)){
+									check();
+									break;
+								}
+							}
+						}
+					}	
+				}
+			}
+
+			function drawBG(){
+				background(color_BG);
+				fill(color_NOPENED);
+				noStroke();
+				rect(50, 10, 240, 55);
+			}
+
+			function drawText(){
+				push();
+				textAlign(CENTER, CENTER);
+				textSize(40);
+				fill("white");
+				text(gamePhase == -1 ? "( ´ Д ⊂ヽ" : gamePhase == 0 ? "(´・ω・｀)" : "*\\( ´∀ `)ノ*", width / 2, 35);
+				pop();
+			}
+
+			function drawTile(){
+				push();
+				noStroke();
+				textSize(20);
+				textAlign(CENTER, CENTER);
+				for (let i = 0 ; i<9 ; i++)
+					for (let j = 0 ; j<9 ; j++)
+						tiles[i][j].show(generated ? minemap[i][j] : null, gamePhase == -1 && explosion_loc == i * 9 + j);
+				pop();
+			}
+
+			function setupTilePosition(){
+				for (let i = 0 ; i<9 ; i++){
+					tilePos.push([]);
+					for (let j = 0 ; j<9 ; j++)
+						tilePos[i].push([15 + 35 * j, 75 + 35 * i]);
+				}
+			}
+
+			function resetGame(){
+				tiles = [];
+				setupTiles();
+				clickDelay = 2;
+				gamePhase = 0;
+				generated = false;
+				minemap = [];
+				explosion_loc = -1;
+			}
+
+			function setupTiles(){
+				for (let i = 0 ; i<9 ; i++){
+					tiles.push([]);
+					for (let j = 0 ; j<9 ; j++)
+						tiles[i].push(new Tile(tilePos[i][j][0], tilePos[i][j][1]));
+				}
+			}
+
+			function generateMap(exception){
+				for (let i = 0 ; i<9 ; i++){
+					minemap.push([]);
+					for (let j = 0 ; j<9 ; j++)
+						minemap[i].push(0);
+				}
+				for (let i = 0 ; i<10 ; ){
+					let loc = parseInt(Math.random()*81);
+					if (loc == exception)	continue;
+					if (minemap[parseInt(loc / 9)][loc % 9] != -1){
+						i++;
+						minemap[parseInt(loc / 9)][loc % 9] = -1;
+					}
+				}
+				for (let i = 0 ; i<9 ; i++){
+					for (let j = 0 ; j<9 ; j++){
+						if (minemap[i][j] == -1)	continue;
+						let sum = 0;
+						for (let ik = -1 ; ik<=1 ; ik++){
+							for (let jk = -1 ; jk<=1 ; jk++){
+								if (ik == 0 && jk == 0)	continue;
+								if (i + ik >= 0 && i + ik < 9 && j + jk >= 0 && j + jk < 9)
+									if (minemap[i + ik][j + jk] == -1)
+										sum++;
+							}
+						}
+						minemap[i][j] = sum;
+					}
+				}
+			}
+
+			function openTile(x, y, source){
+				if (x < 0 || x >= 9 || y < 0 || y >= 9 || tiles[x][y].flagged || tiles[x][y].marked)	return;
+				if (source || !tiles[x][y].opened){
+					tiles[x][y].opened = true;
+					if (minemap[x][y] == 0){
+						for (let i = -1 ; i<=1 ; i++){
+							for (let j = -1 ; j<=1 ; j++){
+								if (i == 0 && j == 0)	continue;
+								openTile(x + i, y + j, false);
+							}
+						}
+					}
+				}
+			}
+
+			function explode(){
+				gamePhase = -1;
+				for (let i = 0 ; i<9 ; i++)
+					for (let j = 0 ; j<9 ; j++)
+						if (minemap[i][j] == -1)
+							if (!tiles[i][j].flagged)
+								tiles[i][j].opened = true;
+			}
+
+			function check(){
+				if (generated){
+					let match_amount = 0;
+					for (let i = 0 ; i<9 ; i++)
+						for (let j = 0 ; j<9 ; j++)
+							if (tiles[i][j].flagged && minemap[i][j] == -1)
+								match_amount++;
+					if (match_amount == 10)
+						gamePhase = 1;
+				}
+			}
+
+			function Tile(x, y){
+				this.x = x;
+				this.y = y;
+				this.hint = -1;
+				this.opened = false;
+				this.flagged = false;
+				this.marked - false;
+				
+				this.show = function(type, isExplosionLocation){
+					if (isExplosionLocation)
+						fill("red");
+					else if (this.opened)
+						fill(type == -1 && this.marked ? "red" : color_OPENED);
+					else 
+						fill(this.flagged ? type == -1 ? gamePhase == -1 || gamePhase == 1 ? "yellow" : color_NOPENED : gamePhase == -1 ? "red" : color_NOPENED : color_NOPENED);
+					rect(this.x, this.y, 30, 30);
+					fill("black");
+					if (this.marked){
+						text("❓", this.x + 15, this.y + 15);
+					}
+					else if (this.flagged){
+						text("🚩", this.x + 15, this.y + 15);
+					}
+					else if (type != null && type != 0 && this.opened){
+						if (type == -1){
+							text("💣", this.x + 15, this.y + 15);
+						}
+						else {
+							text(type, this.x + 15, this.y + 15)
+						}
+					}
+				}
+				
+				this.stepon = function(mouseX, mouseY){
+					if (mouseX > this.x && mouseY > this.y && mouseX - this.x < 30 && mouseY - this.y < 30){
+						if (!this.opened && !this.marked && !this.flagged){
+							this.opened = true;
+						}
+						return true;
+					}
+					return false;
+				}
+				
+				this.switch_ = function(mouseX, mouseY){
+					if (mouseX > this.x && mouseY > this.y && mouseX - this.x < 30 && mouseY - this.y < 30){
+						if (!this.opened){
+							if (this.flagged){
+								this.flagged = false;
+								this.marked = true;
+							}
+							else if (this.marked){
+								this.flagged = false;
+								this.marked = false;
+							}
+							else {
+								this.flagged = true;
+								this.marked = false;
+							}
+						}
+						return true;
+					}
+					return false;
+				}
+			}
+		</script>
+	</head>
+	<body></body>
+</html>
