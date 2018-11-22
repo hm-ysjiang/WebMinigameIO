@@ -28,6 +28,7 @@
 			//The map of the mines
 			var minemap = [];
 			var explosion_loc;
+			var clickDelay = 0;
 			var flagCount;
 
 
@@ -41,54 +42,59 @@
 			}
 
 			function draw(){
+				if (clickDelay > 0)
+					clickDelay--;
 				drawBG();
 				drawText();
 				drawTile();
 			}
 
 			function mousePressed(){
-				if (mouseX > canvasSize[0] / 2 - 120 && mouseX < canvasSize[0] / 2 + 120 && mouseY > 10 && mouseY < 65)
-					resetGame();
-				else if (mouseButton === LEFT ^ switch_LR){
-					if (mouseX > 15 && mouseX < 201 && mouseY > 10 && mouseY < 65)	//rect(15, 10, 186, 55);
+				if (clickDelay == 0){
+					clickDelay = 25;
+					if (mouseX > canvasSize[0] / 2 - 120 && mouseX < canvasSize[0] / 2 + 120 && mouseY > 10 && mouseY < 65)
+						resetGame();
+					else if (mouseX > 15 && mouseX < 201 && mouseY > 10 && mouseY < 65)
 						switch_LR = !switch_LR;
-					else if (gamePhase == 0){
-						for (let i = 0 ; i<mapSize[0] ; i++){
-							for (let j = 0 ; j<mapSize[1] ; j++){
-								if (tiles[i][j].stepon(mouseX, mouseY)){
-									if (!generated){
-										generateMap(i * mapSize[1] + j);
-										generated = true;
-									}
-									if (tiles[i][j].opened){
-										if (minemap[i][j] == -1){
-											explode();
-											explosion_loc = i * mapSize[1] + j;
+					else if (mouseButton === LEFT ^ switch_LR){
+						if (gamePhase == 0){
+							for (let i = 0 ; i<mapSize[0] ; i++){
+								for (let j = 0 ; j<mapSize[1] ; j++){
+									if (tiles[i][j].stepon(mouseX, mouseY)){
+										if (!generated){
+											generateMap(i * mapSize[1] + j);
+											generated = true;
 										}
-										openTile(i, j, true);	
+										if (tiles[i][j].opened){
+											if (minemap[i][j] == -1){
+												explode();
+												explosion_loc = i * mapSize[1] + j;
+											}
+											openTile(i, j, true);	
+										}
+										check();
+										break;
 									}
-									check();
-									break;
 								}
 							}
 						}
 					}
-				}
-				else {
-					if (gamePhase == 0){
-						for (let i = 0 ; i<mapSize[0] ; i++){
-							for (let j = 0 ; j<mapSize[1] ; j++){
-								if (tiles[i][j].switch_(mouseX, mouseY)){
-									if (tiles[i][j].flagged)
-										flagCount++;
-									else if (tiles[i][j].marked)
-										flagCount--;
-									check();
-									break;
+					else {
+						if (gamePhase == 0){
+							for (let i = 0 ; i<mapSize[0] ; i++){
+								for (let j = 0 ; j<mapSize[1] ; j++){
+									if (tiles[i][j].switch_(mouseX, mouseY)){
+										if (tiles[i][j].flagged)
+											flagCount++;
+										else if (tiles[i][j].marked)
+											flagCount--;
+										check();
+										break;
+									}
 								}
-							}
-						}	
-					}
+							}	
+						}
+					}	
 				}
 			}
 
@@ -166,6 +172,7 @@
 				generated = false;
 				minemap = [];
 				explosion_loc = -1;
+				clickDelay = 0;
 				switch_LR = false;
 				flagCount = 0;
 			}
